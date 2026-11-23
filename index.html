@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mappa viaggio Thailandia</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body, #map { height: 100%; margin: 0; font-family: -apple-system, system-ui, sans-serif; }
+  .pin { background: #2b6cb0; color: #fff; border: 2px solid #fff; border-radius: 50%;
+         width: 26px; height: 26px; line-height: 26px; text-align: center; font-weight: 700;
+         font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  .pin.hl { background: #e53e3e; }
+  .title { background: #fff; padding: 6px 10px; border-radius: 6px; font-weight: 700;
+           box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+  .leaflet-popup-content a { color: #2b6cb0; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data.js"></script>
+<script>
+  const key = new URLSearchParams(location.search).get('t') || 'overview';
+  const stage = TRIP[key] || TRIP.overview;
+  const map = L.map('map');
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  const byId = {};
+  const markers = stage.points.map((p, i) => {
+    if (p.id) byId[p.id] = p;
+    const hl = stage.highlight ? p.id === stage.highlight : false;
+    const icon = L.divIcon({ className: '', html: `<div class="pin${hl ? ' hl' : ''}">${i + 1}</div>`,
+                             iconSize: [26, 26], iconAnchor: [13, 13] });
+    const gmaps = `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
+    return L.marker([p.lat, p.lng], { icon }).addTo(map)
+      .bindPopup(`<b>${i + 1}. ${p.n}</b>${p.note ? '<br>' + p.note : ''}<br><a href="${gmaps}" target="_blank">Apri in Google Maps</a>`)
+      .bindTooltip(p.n);
+  });
+
+  if (stage.line) {
+    L.polyline(stage.line.map(id => [byId[id].lat, byId[id].lng]), { color: '#2b6cb0', weight: 4, opacity: .8 }).addTo(map);
+  }
+  map.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
+
+  const t = L.control({ position: 'topright' });
+  t.onAdd = () => { const d = L.DomUtil.create('div', 'title'); d.textContent = stage.title; return d; };
+  t.addTo(map);
+</script>
+</body>
+</html>
