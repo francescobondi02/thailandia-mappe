@@ -30,4 +30,15 @@ window.TRIP = {
       { n: 'Molo Ratchawong', lat: 13.7395, lng: 100.5040, note: 'Boat Party di Capodanno (opzione)' }
     ]
   }
+  ,
+  khaosok: {
+    title: 'Tappa 2 · Khao Sok e lago (02 – 04/01)',
+    highlight: 'bungalow',
+    points: [
+      { n: 'Aeroporto Surat Thani', lat: 9.1326, lng: 99.1356, note: 'Arrivo 02/01 ore 10:15' },
+      { id: 'bungalow', n: 'Khao Sok River & Jungle Bungalow', lat: 8.90811, lng: 98.52395, note: 'Notte 02/01, valigie fino al 04/01' },
+      { n: 'Ingresso Parco Khao Sok', lat: 8.9116, lng: 98.5280, note: 'Sentieri, camminata notturna' },
+      { n: 'Molo Ratchaprapha (lago)', lat: 8.9760, lng: 98.8100, note: 'Partenza barca per il lago (posizione indicativa)' }
+    ]
+  }
 };
