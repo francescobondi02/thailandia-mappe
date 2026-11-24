@@ -8,12 +8,23 @@
 <style>
   html, body, #map { height: 100%; margin: 0; font-family: -apple-system, system-ui, sans-serif; }
   .pin { background: #2b6cb0; color: #fff; border: 2px solid #fff; border-radius: 50%;
-         width: 26px; height: 26px; line-height: 26px; text-align: center; font-weight: 700;
-         font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
-  .pin.hl { background: #e53e3e; }
-  .title { background: #fff; padding: 6px 10px; border-radius: 6px; font-weight: 700;
+         width: 24px; height: 24px; line-height: 24px; text-align: center; font-weight: 700;
+         font-size: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+  .pin.hl { background: #e53e3e; width: 28px; height: 28px; line-height: 28px; font-size: 14px; }
+  .pin.minor { background: #718096; width: 18px; height: 18px; line-height: 18px; font-size: 10px; }
+  .leaflet-tooltip.lbl { background: rgba(255,255,255,.92); border: 0; border-radius: 4px;
+         box-shadow: 0 1px 3px rgba(0,0,0,.3); padding: 1px 5px; font-size: 12px; font-weight: 600; color: #1a202c; }
+  .leaflet-tooltip.lbl::before { display: none; }
+  .title { background: #fff; padding: 5px 9px; border-radius: 6px; font-weight: 700; font-size: 13px;
            box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+  .legend { background: rgba(255,255,255,.95); padding: 6px 9px; border-radius: 6px; font-size: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.3); max-height: 40vh; overflow-y: auto; line-height: 1.5; }
+  .legend b { cursor: pointer; }
+  .legend ol { margin: 4px 0 0; padding-left: 18px; }
+  .legend.closed ol { display: none; }
+  .hint { background: rgba(0,0,0,.6); color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 11px; }
   .leaflet-popup-content a { color: #2b6cb0; }
+  @media (max-width: 480px) { .leaflet-tooltip.lbl { font-size: 10px; } }
 </style>
 </head>
 <body>
@@ -23,31 +34,55 @@
 <script>
   const key = new URLSearchParams(location.search).get('t') || 'overview';
   const stage = TRIP[key] || TRIP.overview;
-  const map = L.map('map');
+  const map = L.map('map', { scrollWheelZoom: false });
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
+  // Do not hijack Notion page scrolling: enable wheel zoom only after a click on the map.
+  map.on('click', () => map.scrollWheelZoom.enable());
+  map.on('mouseout', () => map.scrollWheelZoom.disable());
 
+  const offsets = { right: [12, 0], left: [-12, 0], top: [0, -12], bottom: [0, 12] };
   const byId = {};
   const markers = stage.points.map((p, i) => {
     if (p.id) byId[p.id] = p;
-    const hl = stage.highlight ? p.id === stage.highlight : false;
-    const icon = L.divIcon({ className: '', html: `<div class="pin${hl ? ' hl' : ''}">${i + 1}</div>`,
-                             iconSize: [26, 26], iconAnchor: [13, 13] });
+    const hl = stage.highlight && p.id === stage.highlight;
+    const cls = hl ? 'pin hl' : p.minor ? 'pin minor' : 'pin';
+    const size = hl ? 28 : p.minor ? 18 : 24;
+    const icon = L.divIcon({ className: '', html: `<div class="${cls}">${hl ? '🛏' : i + 1}</div>`,
+                             iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
     const gmaps = `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
-    return L.marker([p.lat, p.lng], { icon }).addTo(map)
-      .bindPopup(`<b>${i + 1}. ${p.n}</b>${p.note ? '<br>' + p.note : ''}<br><a href="${gmaps}" target="_blank">Apri in Google Maps</a>`)
-      .bindTooltip(p.n);
+    const dir = p.dir || 'right';
+    const m = L.marker([p.lat, p.lng], { icon }).addTo(map)
+      .bindPopup(`<b>${i + 1}. ${p.n}</b>${p.note ? '<br>' + p.note : ''}<br><a href="${gmaps}" target="_blank">Apri in Google Maps</a>`);
+    m.bindTooltip(p.n, { permanent: !p.minor, direction: dir, offset: offsets[dir] || offsets.right, className: 'lbl' });
+    return m;
   });
 
   if (stage.line) {
-    L.polyline(stage.line.map(id => [byId[id].lat, byId[id].lng]), { color: '#2b6cb0', weight: 4, opacity: .8 }).addTo(map);
+    L.polyline(stage.line.map(id => [byId[id].lat, byId[id].lng]),
+      { color: '#2b6cb0', weight: 3, opacity: .7, dashArray: '6 6' }).addTo(map);
   }
-  map.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
+  map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
 
   const t = L.control({ position: 'topright' });
   t.onAdd = () => { const d = L.DomUtil.create('div', 'title'); d.textContent = stage.title; return d; };
   t.addTo(map);
+
+  const lg = L.control({ position: 'bottomleft' });
+  lg.onAdd = () => {
+    const d = L.DomUtil.create('div', 'legend' + (window.innerHeight < 600 ? ' closed' : ''));
+    d.innerHTML = '<b>📍 Punti ▾</b><ol>' + stage.points.map(p =>
+      `<li>${p.id && p.id === stage.highlight ? '🛏 ' : ''}${p.n}</li>`).join('') + '</ol>';
+    d.querySelector('b').onclick = () => d.classList.toggle('closed');
+    L.DomEvent.disableClickPropagation(d);
+    return d;
+  };
+  lg.addTo(map);
+
+  const h = L.control({ position: 'bottomright' });
+  h.onAdd = () => { const d = L.DomUtil.create('div', 'hint'); d.textContent = 'Clicca un punto per i dettagli'; return d; };
+  h.addTo(map);
 </script>
 </body>
 </html>
